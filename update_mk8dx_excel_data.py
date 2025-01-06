@@ -1,3 +1,11 @@
+"""
+This script processes images of Mario Kart 8 Deluxe
+and extracts the lap times and other data from the images.
+
+Author: Stephen Haptonstahl
+Email: srh@haptonstahl.org
+"""
+
 import tempfile
 from PIL import Image, ImageOps  # noqa: F401
 from pathlib import Path
