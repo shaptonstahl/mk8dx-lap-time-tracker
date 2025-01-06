@@ -1,0 +1,47 @@
+# SAVE IN CASE WE NEED THE COORDINATES
+if kind == None:
+            return self.pull_data_from_image(kind=self.kind)
+        if kind not in [1,2,3]:
+            return {}
+        if kind == 1:
+            racer = self.ocr_box(box=[788, 110, 1074, 143])
+            overall_time = self.ocr_box(box=[870, 144, 1075, 190])
+            lap_times = {
+                1: self.ocr_box(box=[866, 210, 1026, 250]),
+                2: self.ocr_box(box=[866, 250, 1026, 290]),
+                3: self.ocr_box(box=[866, 290, 1026, 330])
+            }
+            vehicle = self.ocr_box(box=[830, 350, 1100, 390])
+            wheels = self.ocr_box(box=[830, 410, 1100, 450])
+            glider = self.ocr_box(box=[830, 470, 1100, 510])
+            track = self.ocr_box(box=[300, 640, 830, 690])
+            output = {
+                'racer': racer,
+                'overall_time': overall_time,
+                'lap_times': lap_times,
+                'vehicle': vehicle,
+                'wheels': wheels,
+                'glider': glider,
+                'track': track
+            }
+        elif kind == 2:
+            character_name = self.ocr_box(box=[615, 120, 920, 155])
+            overall_time = self.ocr_box(box=[1039, 113, 1210, 152])
+            lap_times = {
+                1: self.ocr_box(box=[1047, 145, 1200, 210]),
+                2: self.ocr_box(box=[1047, 222, 1200, 253]),
+                3: self.ocr_box(box=[1047, 264, 1200, 298])
+            }
+            vehicle = self.ocr_box(box=[671, 171, 973, 202])
+            wheels = self.ocr_box(box=[671, 220, 973, 252])
+            glider = self.ocr_box(box=[671, 265, 973, 298])
+            output = {
+                'character_name': character_name,
+                'overall_time': overall_time,
+                'lap_times': lap_times,
+                'vehicle': vehicle,
+                'wheels': wheels,
+                'glider': glider
+            }
+        elif kind == 3:
+            output = {}
