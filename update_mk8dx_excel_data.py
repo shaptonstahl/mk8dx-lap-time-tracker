@@ -14,6 +14,7 @@ import polars as pl
 import pickle
 import argparse
 from pprint import pprint
+import re
 
 # Make Mindee API key accessible
 load_dotenv()
@@ -347,22 +348,20 @@ def calc_overall_time(output_from_mindee: dict) -> str:
     Given the output from Mindee, calculate the overall time.
     """
     lap_time_strings = [
-        v for k, v in output_from_mindee.items() if len(k) > 2 and k[0:3] == "lap"
+        "0" + re.search(r"^\d:\d{2}\.\d{3}$", v).group(0) + "000"
+        for k, v in output_from_mindee.items()
+        if len(k) > 2
+        and k[0:3] == "lap"
+        and v is not None
+        and re.search(r"^\d:\d{2}\.\d{3}$", v) is not None
     ]
-    if len(lap_time_strings) == 0:
-        print("No lap times found in Mindee output for this file")
-        return ""
-    if any([v is None or len(v) != 8 for v in lap_time_strings]):
-        print("Lap times are not in the expected format in Mindee output for this file")
+
+    if len(lap_time_strings) not in [3, 7]:
         return ""
     lap_timedeltas = [
-        dt.datetime.strptime("0" + v[0:8] + "000", "%M:%S.%f") - dt.datetime(1900, 1, 1)
-        for k, v in output_from_mindee.items()
-        if len(k) > 2 and k[0:3] == "lap" and v is not None
+        dt.datetime.strptime(v, "%M:%S.%f") - dt.datetime(1900, 1, 1)
+        for v in lap_time_strings
     ]
-    # Sometimes the OCR doesn't pick up all of the lap times.
-    if len(lap_timedeltas) not in [3, 7]:
-        return ""
     overall_timedelta = sum(lap_timedeltas, dt.timedelta(seconds=0))
     return "{:02}:{:02}.{:03}".format(
         overall_timedelta.seconds // 60,
