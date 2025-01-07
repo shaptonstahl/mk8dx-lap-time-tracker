@@ -69,7 +69,7 @@ image_processing_parmeters = {
                 "lap_1_time",
                 "lap_2_time",
                 "lap_3_time",
-            ],
+            ]
         }
     ],
     2: [
@@ -83,12 +83,45 @@ image_processing_parmeters = {
                 "character_name",
                 "vehicle",
                 "wheels",
-                "glider",
-                "overall_time",
-                "lap_1_time",
-                "lap_2_time",
-                "lap_3_time",
+                "glider"
+            ]
+        },
+        {
+            "framework": "ocrs",
+            "box": [1047, 145, 1200, 210],
+            "transformations": [
+                {'transformation': 'grayscale'}, 
+                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
             ],
+            "fields": ['lap_1_time']
+        },
+        {
+            "framework": "ocrs",
+            "box": [1047, 222, 1200, 253],
+            "transformations": [
+                {'transformation': 'grayscale'}, 
+                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
+            ],
+            "fields": ['lap_2_time']
+        },
+        {
+            "framework": "ocrs",
+            "box": [1047, 264, 1200, 298],
+            "transformations": [
+                {'transformation': 'grayscale'}, 
+                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
+            ],
+            "fields": ['lap_3_time']
+        },
+        {
+            "framework": "ocrs",
+            "box": [1039, 113, 1210, 152],
+            "transformations": [
+                {'transformation': 'grayscale'}, 
+                {'transformation': 'invert'},
+                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.75, 'preserve_tone': True}}
+            ],
+            "fields": ['overall_time']
         }
     ],
     3: [
@@ -114,19 +147,19 @@ image_processing_parmeters = {
                 "overall_time",
                 "lap_1_time",
                 "lap_2_time",
-                "lap_3_time",
+                "lap_3_time"
             ],
         },
         {
             "framework": "ocrs",
             "box": [1, 1, 1280, 720],
             "transformations": [],
-            "fields": ["something"],
+            "fields": ["something"]
         },
     ],
     4: [
         {"framework": "mindee", "box": [1, 1, 1280, 720]},
-        {"framework": "ocrs", "fields": ["something"]},
+        {"framework": "ocrs", "fields": ["something"]}
     ],
 }
 
