@@ -1,9 +1,10 @@
 """
-This script processes images of Mario Kart 8 Deluxe
-and extracts the lap times and other data from the images.
+This script processes images of Mario Kart 8 Deluxe final times
+then extracts the lap times and other data.
 
 Author: Stephen Haptonstahl
 Email: srh@haptonstahl.org
+Source: https://github.com/shaptonstahl/mk8dx-lap-time-tracker
 """
 
 import tempfile
@@ -29,7 +30,6 @@ import base64
 
 # Make Mindee and OpenAI API keys accessible
 load_dotenv()
-
 
 # Set some OpenAI variables
 openai_api_key = os.getenv("OPENAI_API_KEY")
