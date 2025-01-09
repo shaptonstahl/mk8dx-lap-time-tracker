@@ -23,9 +23,25 @@ import pickle
 import argparse
 from pprint import pprint
 import re
+import openai
+from pydantic import BaseModel
+import base64
 
-# Make Mindee API key accessible
+# Make Mindee and OpenAI API keys accessible
 load_dotenv()
+
+
+# Set some OpenAI variables
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key is None:
+    raise ValueError("OpenAI API key is not set in environment variables.")
+
+openai_url = "https://api.openai.com/v1/chat/completions"
+openai_headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {openai_api_key}",
+}
+
 
 # Image kind identification uses ocrs without processing other than cropping.
 image_kind_identification_parameters = {
@@ -48,11 +64,169 @@ image_kind_identification_parameters = {
 }
 
 
+class kind_1_image(BaseModel):
+    """
+    Defines the return type for a call to the OpenAI API
+    """
+
+    racer: str
+    character_name: str
+    vehicle: str
+    wheels: str
+    glider: str
+    track: str
+    overall_time: str
+    lap_1_time: str
+    lap_2_time: str
+    lap_3_time: str
+    nationality: str
+
+
+class kind_2_image(BaseModel):
+    """
+    Defines the return type for a call to the OpenAI API
+    """
+
+    character_name: str
+    vehicle: str
+    wheels: str
+    glider: str
+    overall_time: str
+    lap_1_time: str
+    lap_2_time: str
+    lap_3_time: str
+    nationality: str
+
+
+class kind_3_image(BaseModel):
+    """
+    Defines the return type for a call to the OpenAI API
+    """
+
+    racer: str
+    character_name: str
+    vehicle: str
+    wheels: str
+    glider: str
+    overall_time: str
+    lap_1_time: str
+    lap_2_time: str
+    lap_3_time: str
+    nationality: str
+    racer_2: str
+    character_name_2: str
+    vehicle_2: str
+    wheels_2: str
+    glider_2: str
+    overall_time_2: str
+    lap_1_time_2: str
+    lap_2_time_2: str
+    lap_3_time_2: str
+    nationality_2: str
+
+
+# schema: prompts[llm_platform][image_kind] = 'prompt'
+prompts = {
+    "openai": {
+        1: """
+You are a Mario Kart 8 Deluxe player. Look at the included image. 
+Identify the nationality of the player by looking at the national
+flag under the racer's name. Identify the Mario Kart character by
+looking at the character's head to the left of the racer's name.
+Pay attention to whether the character is a baby or not because
+that may change its name.
+Respond in json with the following fields:
+""",
+        2: """
+You are a Mario Kart 8 Deluxe player. Look at the included image. 
+Identify the nationality of the player by looking at the national
+flag to the right of the racer's name and to the left of the 
+overall_time. Identify the Mario Kart character by looking at the 
+character's head to the left of the racer's name.
+Pay attention to whether the character is a baby or not because
+that may change its name.
+Respond in json with the following fields:
+""",
+        3: """
+You are a Mario Kart 8 Deluxe player. Look at the included image.
+There are two blocks of text and numbers, a top block and a bottom 
+block. The top block lists information about player one and the bottom
+block lists information about player two.
+
+For each player, idenitfy:
+
+-  The nationality of the player by looking at the national flag to
+the right of the players's name and to the left of the overall_time.
+Field: "nationality" or "nationality_2". If the flag is the United
+States flag, set the field to 'USA'.
+
+- The Mario Kart character by looking at the character's head to the
+left of the player's name. Pay attention to whether the character is 
+a baby or not because that may change its name.
+Field: "character_name" or "character_name_2"
+
+- The name of the player. Field: "racer" or "racer_2"
+
+- Overall time. The overall time is to the right of the nationality 
+flag for each player.
+
+- Times for lap 1, lap 2, and lap 3
+
+- Vehicle
+
+- Wheels
+
+- Glider
+""",
+    }
+}
+
+prompts["openai"][1] = prompts["openai"][1] + ", ".join(
+    [k for k, v in kind_1_image.model_fields.items()]
+)
+prompts["openai"][2] = prompts["openai"][2] + ", ".join(
+    [k for k, v in kind_2_image.model_fields.items()]
+)
+
+
+def encode_image_for_api_call(image_path: Path) -> str:
+    """
+    Given the location of an image, encode as a string suitable for inclusion
+    in an API call, particularly to OpenAI.
+    """
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
 # This defines how to extract fields from the image once the kind has been identified.
 # Each kind has a list of extractions that is applied in order. Each extraction is a
 # dictionary.
 image_processing_parmeters = {
     1: [
+        {
+            "framework": "openai",
+            "box": [1, 1, 1280, 720],
+            "transformations": [],
+            "fields": [k for k, v in kind_1_image.model_fields.items()],
+        }
+    ],
+    2: [
+        {
+            "framework": "openai",
+            "box": [1, 1, 1280, 720],
+            "transformations": [],
+            "fields": [k for k, v in kind_2_image.model_fields.items()],
+        }
+    ],
+    3: [
+        {
+            "framework": "openai",
+            "box": [1, 1, 1280, 720],
+            "transformations": [],
+            "fields": [k for k, v in kind_3_image.model_fields.items()],
+        }
+    ],
+    11: [
         {
             "framework": "mindee",
             "box": [1, 1, 1280, 720],
@@ -69,62 +243,69 @@ image_processing_parmeters = {
                 "lap_1_time",
                 "lap_2_time",
                 "lap_3_time",
-            ]
+            ],
         }
     ],
-    2: [
+    21: [
         {
             "framework": "mindee",
             "box": [1, 1, 1280, 720],
             "transformations": [],
             "endpoint_name": "mk8dx_screen_capture_kind_2",
             "endpoint_version": "1",
-            "fields": [
-                "character_name",
-                "vehicle",
-                "wheels",
-                "glider"
-            ]
+            "fields": ["character_name", "vehicle", "wheels", "glider"],
         },
         {
             "framework": "ocrs",
             "box": [1047, 145, 1200, 210],
             "transformations": [
-                {'transformation': 'grayscale'}, 
-                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
+                {"transformation": "grayscale"},
+                {
+                    "transformation": "autocontrast",
+                    "parameters": {"cutoff": 0.5, "preserve_tone": True},
+                },
             ],
-            "fields": ['lap_1_time']
+            "fields": ["lap_1_time"],
         },
         {
             "framework": "ocrs",
             "box": [1047, 222, 1200, 253],
             "transformations": [
-                {'transformation': 'grayscale'}, 
-                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
+                {"transformation": "grayscale"},
+                {
+                    "transformation": "autocontrast",
+                    "parameters": {"cutoff": 0.5, "preserve_tone": True},
+                },
             ],
-            "fields": ['lap_2_time']
+            "fields": ["lap_2_time"],
         },
         {
             "framework": "ocrs",
             "box": [1047, 264, 1200, 298],
             "transformations": [
-                {'transformation': 'grayscale'}, 
-                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.5, 'preserve_tone': True}}
+                {"transformation": "grayscale"},
+                {
+                    "transformation": "autocontrast",
+                    "parameters": {"cutoff": 0.5, "preserve_tone": True},
+                },
             ],
-            "fields": ['lap_3_time']
+            "fields": ["lap_3_time"],
         },
         {
             "framework": "ocrs",
             "box": [1039, 113, 1210, 152],
             "transformations": [
-                {'transformation': 'grayscale'}, 
-                {'transformation': 'invert'},
-                {'transformation': 'autocontrast', 'parameters': {'cutoff': 0.75, 'preserve_tone': True}}
+                {"transformation": "grayscale"},
+                {"transformation": "invert"},
+                {
+                    "transformation": "autocontrast",
+                    "parameters": {"cutoff": 0.75, "preserve_tone": True},
+                },
             ],
-            "fields": ['overall_time']
-        }
+            "fields": ["overall_time"],
+        },
     ],
-    3: [
+    31: [
         {
             "framework": "mindee",
             "box": [1, 1, 1280, 720],
@@ -147,19 +328,19 @@ image_processing_parmeters = {
                 "overall_time",
                 "lap_1_time",
                 "lap_2_time",
-                "lap_3_time"
+                "lap_3_time",
             ],
         },
         {
             "framework": "ocrs",
             "box": [1, 1, 1280, 720],
             "transformations": [],
-            "fields": ["something"]
+            "fields": ["something"],
         },
     ],
-    4: [
+    41: [
         {"framework": "mindee", "box": [1, 1, 1280, 720]},
-        {"framework": "ocrs", "fields": ["something"]}
+        {"framework": "ocrs", "fields": ["something"]},
     ],
 }
 
@@ -195,7 +376,7 @@ def validate_all_extractions(extractions: list[dict]) -> bool:
 
 
 def transform_image_and_save(
-    image_file: Path, box: list[int] = None, transformations: list[dict] = None
+    image_path: Path, box: list[int] = None, transformations: list[dict] = None
 ) -> Path:
     """
     Given an image file and a list of transformations, perform the transformations
@@ -219,7 +400,7 @@ def transform_image_and_save(
 
     Cropping with the specified box is always the first transformation.
     """
-    with Image.open(image_file) as img:
+    with Image.open(image_path) as img:
         if box is not None:
             img = img.crop(box)
         if transformations is not None:
@@ -247,6 +428,7 @@ def transform_image_and_save(
 def ocr_image(
     image_file: Path,
     framework: str,
+    kind: int = None,
     endpoint_name: str = None,
     endpoint_version: str = None,
 ) -> dict:
@@ -274,28 +456,47 @@ def ocr_image(
         return {
             k: v.value for k, v in result.document.inference.prediction.fields.items()
         }
-    elif framework == "ocrs":
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temporary_file:
-            temporary_file_name = temporary_file.name
-        Image.open(image_file).save(temporary_file_name)
-        ocr_result = subprocess.run(
-            ["ocrs", temporary_file_name], stdout=subprocess.PIPE
+    elif framework == "openai":
+        openai_client = openai.OpenAI(api_key=openai_api_key)
+        base64_image = encode_image_for_api_call(image_file)
+        openai_response = openai_client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompts["openai"][kind]},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=300,
+            response_format=eval(f"kind_{kind}_image"),
         )
+
+        return dict(openai_response.choices[0].message.parsed)
+    elif framework == "ocrs":
+        ocr_result = subprocess.run(["ocrs", image_file], stdout=subprocess.PIPE)
         return {"ocr_result": ocr_result.stdout.decode("utf-8").strip()}
     else:
         return {}
 
 
-def identify_kind(image_file: Path) -> int:
+def identify_kind(image_path: Path) -> int:
     """
     Given an image, return the kind of image.
     """
-    if Image.open(image_file).size != (1280, 720):
+    if Image.open(image_path).size != (1280, 720):
         return 0
     for kind_to_check in image_kind_identification_parameters["order_to_check"]:
         parameters = image_kind_identification_parameters[kind_to_check]
         transformed_file_name = transform_image_and_save(
-            image_file, box=parameters["box"]
+            image_path, box=parameters["box"]
         )
         ocr_result = ocr_image(transformed_file_name, framework="ocrs")["ocr_result"]  # noqa: F841
         condition_to_check = "ocr_result" + parameters["expected_value"]
@@ -306,46 +507,54 @@ def identify_kind(image_file: Path) -> int:
     return 0
 
 
-def extract_fields_from_image(image_file: Path) -> dict:
+def extract_fields_from_image(image_path: Path) -> dict:
     """
     Given an image file, return a dictionary of fields extracted from the image.
     """
-    kind = identify_kind(image_file)
+    kind = identify_kind(image_path)
     if kind == 0:
         return {}
 
     output = {}
-    kind_extractions = image_processing_parmeters[
-        kind
-    ]  # This is a list for the given kind.
-    for parameters in kind_extractions:  # This is a dict for each extraction.
+    # 'kind_extractions' is a list for the given kind.
+    kind_extractions = image_processing_parmeters[kind]
+
+    for parameters in kind_extractions:  # 'parameters' is a dict for each extraction.
         temp_file_name = transform_image_and_save(
-            image_file,
+            image_path,
             box=parameters.get("box", None),
             transformations=parameters.get("transformations", None),
         )
         ocr_output = ocr_image(
             temp_file_name,
             framework=parameters["framework"],
+            kind=kind,
             endpoint_name=parameters.get("endpoint_name", None),
             endpoint_version=parameters.get("endpoint_version", None),
         )
 
         if parameters["framework"] == "ocrs":
             output.update({parameters["fields"][0]: ocr_output["ocr_result"]})
-        elif parameters["framework"] == "mindee":
+        elif parameters["framework"] in ["mindee", "openai"]:
             output.update(ocr_output)
         else:
             pass
 
         os.remove(temp_file_name)
 
-    output["overall_time"] = calc_overall_time(output)
+    # overall_times = calc_overall_times(output)
+    # breakpoint()
+    # output["overall_time"] = overall_times[0]
+    # if len(overall_times) == 2:
+    #     output["overall_time_2"] = overall_times[1]
+    #
+    # ADD CHECK THAT OVERALL TIMES ARE THE SUM OF THE LAP TIMES
+    #
     output["kind"] = kind
-    output["image_file_name"] = image_file.stem + ".jpg"
+    output["image_file_name"] = image_path.name
     output["datetime_processed"] = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
     output["race_end_datetime"] = dt.datetime.strptime(
-        image_file.stem[0:14], "%Y%m%d%H%M%S"
+        image_path.stem[0:14], "%Y%m%d%H%M%S"
     ).strftime("%Y-%m-%d %H:%M:%S")
 
     return output
@@ -357,8 +566,8 @@ def read_list_of_files(folder: Path) -> set[Path]:
     of the *.jpg files in that folder. Does not go into subfolders.
     """
     all_files_in_folder = Path(folder).glob("*.jpg")
-    all_jpg_files = [x for x in all_files_in_folder if x.is_file()]
-    return set(all_jpg_files)
+    all_jpg_file_paths = [x for x in all_files_in_folder if x.is_file()]
+    return set(all_jpg_file_paths)
 
 
 def load_cache_and_list_of_paths_to_process(
@@ -368,35 +577,39 @@ def load_cache_and_list_of_paths_to_process(
     Given a folder to process and a cache file name, load the cache file and
     return the cache as a DataFrame and a set of Path objects to process.
     """
-    all_jpg_files = read_list_of_files(folder_to_process)
+    all_jpg_file_paths = read_list_of_files(folder_to_process)
+    # Take just the name, no folder into
+    all_jpg_files = {f.name for f in all_jpg_file_paths}
 
     if os.path.exists(cache_file_path):
         # Read cache, get file names, read against new file names.
         # Remove cached file names from all_jpg_files and set file_to_process.
         with open(cache_file_path, "rb") as f:
             cached_df = pickle.load(f)
+
         cached_file_names = set(cached_df["image_file_name"].to_list())
         files_to_process = all_jpg_files - cached_file_names
     else:
         # No cache, so process all files.
         cached_df = None
         files_to_process = all_jpg_files
-    return cached_df, files_to_process
+
+    file_paths_to_process = {Path(folder_to_process, f) for f in files_to_process}
+    return cached_df, file_paths_to_process
 
 
-def calc_overall_time(output_from_mindee: dict) -> str:
+def calc_overall_times(output_from_ocr: dict) -> list[str]:
     """
     Given the output from Mindee, calculate the overall time.
     """
     lap_time_strings = [
         "0" + re.search(r"^\d:\d{2}\.\d{3}$", v).group(0) + "000"
-        for k, v in output_from_mindee.items()
+        for k, v in output_from_ocr.items()
         if len(k) > 2
-        and k[0:3] == "lap"
+        and re.search(r"time$", k) is not None
         and v is not None
         and re.search(r"^\d:\d{2}\.\d{3}$", v) is not None
     ]
-
     if len(lap_time_strings) not in [3, 7]:
         return ""
     lap_timedeltas = [
@@ -404,14 +617,44 @@ def calc_overall_time(output_from_mindee: dict) -> str:
         for v in lap_time_strings
     ]
     overall_timedelta = sum(lap_timedeltas, dt.timedelta(seconds=0))
-    return "{:02}:{:02}.{:03}".format(
-        overall_timedelta.seconds // 60,
-        overall_timedelta.seconds % 60,
-        overall_timedelta.microseconds // 1000,
-    )
+    overall_times = [
+        "{:02}:{:02}.{:03}".format(
+            overall_timedelta.seconds // 60,
+            overall_timedelta.seconds % 60,
+            overall_timedelta.microseconds // 1000,
+        )
+    ]
+
+    if "lap_1_time_2" in output_from_ocr:
+        lap_time_2_strings = [
+            "0" + re.search(r"^\d:\d{2}\.\d{3}$", v).group(0) + "000"
+            for k, v in output_from_ocr.items()
+            if len(k) > 2
+            and re.search(r"time_2$", k) is not None
+            and v is not None
+            and re.search(r"^\d:\d{2}\.\d{3}$", v) is not None
+        ]
+        if len(lap_time_2_strings) not in [3, 7]:
+            return ""
+        lap_2_timedeltas = [
+            dt.datetime.strptime(v, "%M:%S.%f") - dt.datetime(1900, 1, 1)
+            for v in lap_time_2_strings
+        ]
+        overall_2_timedelta = sum(lap_2_timedeltas, dt.timedelta(seconds=0))
+        overall_times.append(
+            [
+                "{:02}:{:02}.{:03}".format(
+                    overall_2_timedelta.seconds // 60,
+                    overall_2_timedelta.seconds % 60,
+                    overall_2_timedelta.microseconds // 1000,
+                )
+            ]
+        )
+
+    return overall_times
 
 
-def process_list_of_files(file_names: list[Path]) -> list[dict]:
+def process_list_of_files(file_paths: list[Path]) -> list[dict]:
     """
     Given a list of files (complete paths) process the files and return a list of
     dictionaries with the processed ocr text.
@@ -420,18 +663,14 @@ def process_list_of_files(file_names: list[Path]) -> list[dict]:
     a base record with all of the columns to ensure that all are present in the
     output and that they are in the desired order.
     """
-    if debug:
-        with open("./kind_1_test_ocr_output.pkl", "rb") as f:
-            ocr_results = [pickle.load(f)]
-    else:
-        raw_ocr_results = {f.name: extract_fields_from_image(f) for f in file_names}
-        # Purge empty dictionaries
-        ocr_results = [v for k, v in raw_ocr_results.items() if v != {}]
+    raw_ocr_results = [extract_fields_from_image(image_path=f) for f in file_paths]
+    # Purge empty dictionaries
+    ocr_results = [v for v in raw_ocr_results if v != {}]
 
     return ocr_results
 
 
-def convert_ocr_dict_to_polars(x: dict) -> pl.DataFrame:
+def convert_ocr_dicts_to_polars(ocr_output: list[dict]) -> pl.DataFrame:
     """
     Takes the generated ocr output (a list of dictionaries) and converts it to a polars
     DataFrame. It starts with an empty row with all of the target columns in the target
@@ -439,9 +678,9 @@ def convert_ocr_dict_to_polars(x: dict) -> pl.DataFrame:
     """
     field_names_in_order = [
         "race_end_datetime",
+        "track",
         "racer",
         "character_name",
-        "track",
         "vehicle",
         "wheels",
         "glider",
@@ -449,6 +688,17 @@ def convert_ocr_dict_to_polars(x: dict) -> pl.DataFrame:
         "lap_1_time",
         "lap_2_time",
         "lap_3_time",
+        "nationality",
+        "racer_2",
+        "character_name_2",
+        "vehicle_2",
+        "wheels_2",
+        "glider_2",
+        "overall_time_2",
+        "lap_1_time_2",
+        "lap_2_time_2",
+        "lap_3_time_2",
+        "nationality_2",
         "image_file_name",
         "kind",
         "datetime_processed",
@@ -457,7 +707,8 @@ def convert_ocr_dict_to_polars(x: dict) -> pl.DataFrame:
     # Create DataFrame with default row (which has empty strings) and given DataFrame.
     # Using the default row first ensures that all columns are present in the output
     # and that they're in the desired order.
-    output_df = pl.DataFrame(default_row + x)
+
+    output_df = pl.DataFrame(default_row + ocr_output)
     # Filter to select rows with image_file_name not empty.
     output_df = output_df.filter(pl.col("image_file_name") != "")
     return output_df
@@ -466,11 +717,12 @@ def convert_ocr_dict_to_polars(x: dict) -> pl.DataFrame:
 def update_cache(
     cache_file_path: Path, new_df: pl.DataFrame, old_cache_df: pl.DataFrame = None
 ) -> None:
-    if old_cache_df is None:
-        cached_and_new_df = new_df
-    else:
-        cached_and_new_df = pl.concat([old_cache_df, new_df])
-
+    """
+    Given a Path for a cached pickle file of a polars DataFrame,
+    a polars DataFrame of new records, and a polars DataFrame previously
+    read from the cache, merge the two and save the updated DataFrame to
+    the pickle file.
+    """
     if old_cache_df is None:
         with open(cache_file_path, "wb") as f:
             pickle.dump(new_df, f)
@@ -579,7 +831,7 @@ def main(
         print("Processed OCR output:")
         pprint(processed_ocr_output)
 
-    new_records_df = convert_ocr_dict_to_polars(processed_ocr_output)
+    new_records_df = convert_ocr_dicts_to_polars(processed_ocr_output)
     if verbose:
         print("Number of new records:", new_records_df.shape[0])
 
